@@ -20,7 +20,7 @@ jobs:
 
       - name: Install R packages
         run: |
-          install.packages(c('rmarkdown', 'gsheet', 'dplyr', 'tidyr', 'lubridate' 'stringr', 'leaflet', 'maps', 'tigris', 'crosstalk'))
+          install.packages(c('rmarkdown', 'gsheet', 'dplyr', 'tidyr', 'lubridate', 'stringr', 'leaflet', 'maps', 'tigris', 'crosstalk'))
 
       - name: Render R Markdown
         run: |

@@ -42,13 +42,12 @@ rm(list = ls())
 cat("\014")
 
 # Loads required libraries
-library(rstudioapi)
+#library(rstudioapi)
 library(gsheet)
 library(dplyr)
 library(tidyr)
 library(lubridate)
 library(stringr)
-library(readxl)
 library(leaflet)
 library(maps)
 library(tigris)
@@ -232,7 +231,6 @@ icons <- awesomeIconList(
 )
 
 # State & County Lines
-
 # state_outline <-
 #   maps::map(
 #     database = "state",
@@ -241,8 +239,7 @@ icons <- awesomeIconList(
 #     plot = FALSE
 #   )
 
-county_outlines <-
-  tigris::counties(cb = TRUE) %>%
+county_outlines <- tigris::counties(cb = TRUE) %>%
   filter(STATE_NAME == "Michigan")
 ```
 
@@ -301,7 +298,7 @@ bscols(
   ""
 )
 
-# BT Points Slider
+# Tree Points Slider
 bscols(
   widths = c(1, 10, 1),
   "",

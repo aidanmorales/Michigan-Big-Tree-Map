@@ -20,11 +20,12 @@ jobs:
 
       - name: Install R packages
         run: |
-          install.packages(c('rmarkdown', 'gsheet', 'dplyr', 'tidyr', 'lubridate', 'stringr', 'leaflet', 'maps', 'tigris', 'crosstalk'))
+          Rscript -e "install.packages(c('rmarkdown', 'gsheet', 'dplyr', 'tidyr', 'lubridate', 'stringr', 'leaflet', 'maps', 'tigris', 'crosstalk'))"
 
       - name: Render R Markdown
         run: |
           Rscript -e "rmarkdown::render('map.Rmd', output_file = 'index.html', output_dir = 'docs')"
+
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3

@@ -55,7 +55,7 @@ library(tigris)
 library(crosstalk)
 
 # Sets the working directory to the script location
-setwd(dirname(getActiveDocumentContext()$path))
+#setwd(dirname(getActiveDocumentContext()$path))
 
 # Big Tree Database URL
 url <- "https://docs.google.com/spreadsheets/d/1uH6l1s3Sn6lEUeZMJGkrN0I4PtzTVoqf0xt3vX2pJXM/edit?usp=sharing"

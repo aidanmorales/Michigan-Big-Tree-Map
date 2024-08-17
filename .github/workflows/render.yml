@@ -36,6 +36,7 @@ jobs:
         run: |
           Rscript -e "install.packages('rmarkdown', dependencies = TRUE)"
           Rscript -e "install.packages('gsheet', dependencies = TRUE)"
+          Rscript -e "install.packages('sf', dependencies = TRUE)"
           Rscript -e "install.packages('dplyr', dependencies = TRUE)"
           Rscript -e "install.packages('tidyr', dependencies = TRUE)"
           Rscript -e "install.packages('lubridate', dependencies = TRUE)"
@@ -44,6 +45,10 @@ jobs:
           Rscript -e "install.packages('maps', dependencies = TRUE)"
           Rscript -e "install.packages('tigris', dependencies = TRUE)"
           Rscript -e "install.packages('crosstalk', dependencies = TRUE)"
+
+      - name: Verify package installations
+        run: |
+          Rscript -e "installed.packages()"
 
       - name: Render R Markdown
         run: |

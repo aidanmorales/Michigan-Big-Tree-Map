@@ -20,6 +20,10 @@ jobs:
         with:
           r-version: '4.4'  
 
+      - name: Ensure Pandoc is installed
+        run: |
+          brew install pandoc
+
       - name: Install R packages
         run: |
           Rscript -e "install.packages('rmarkdown', dependencies = TRUE)"

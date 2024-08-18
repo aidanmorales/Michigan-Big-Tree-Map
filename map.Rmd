@@ -1,0 +1,359 @@
+---
+title: "Michigan Big Tree Map"
+author: "Aidan Morales"
+date: "`r paste('Built:', Sys.Date())`"
+output: html_document
+---
+
+<style type="text/css">
+
+h1.title {
+  font-size: 38px;
+  color: black;
+  text-align: center;
+}
+h4.author { /* Header 4 - and the author and data headers use this too  */
+    font-size: 0px;
+  font-family: "Times New Roman", Times, serif;
+  color: black;
+  text-align: center;
+}
+h4.date { /* Header 4 - and the author and data headers use this too  */
+  font-size: 8 px;
+  <!-- font-family: "Times New Roman", Times, serif; -->
+  color: black;
+  text-align: center;
+}
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r, results=FALSE, warning=FALSE, message=FALSE, error=FALSE}
+################################################################################
+#### 1. Load Data ##############################################################
+################################################################################
+
+# Removes existing objects from the workspace
+rm(list = ls())
+
+# Clears the console
+cat("\014")
+
+# Loads required libraries
+#library(rstudioapi)
+library(gsheet)
+library(dplyr)
+library(tidyr)
+library(lubridate)
+library(stringr)
+library(leaflet)
+library(maps)
+library(tigris)
+library(crosstalk)
+
+# Sets the working directory to the script location
+#setwd(dirname(getActiveDocumentContext()$path))
+
+# Big Tree Database URL
+url <- "https://docs.google.com/spreadsheets/d/1uH6l1s3Sn6lEUeZMJGkrN0I4PtzTVoqf0xt3vX2pJXM/edit?usp=sharing"
+
+# Use gsheet package to dynamically download the latest file
+url_new <- construct_download_url(url, format = "csv", sheetid = NULL)
+raw_df <- gsheet2tbl(url_new)
+```
+
+```{r, results=FALSE, warning=FALSE, message=FALSE, error=FALSE}
+################################################################################
+#### 2. Clean Data #############################################################
+################################################################################
+
+# Initial cleaning of the raw data
+clean_df <- raw_df %>%
+  select(
+    `Big Tree ID` = 1, Points, Girth, Height, Spread = `Crown Spread`,
+    `National Champion`, `~Scientific Name`, `Common name`, Lat,
+    Long, County, `Observation Date`, Address = 17,
+    `Location Notes` = 13
+  ) %>%
+  rename(
+    ID = 1,
+    common.name = `Common name`,
+    scientific.name = `~Scientific Name`,
+    points = Points,
+    girth = Girth,
+    height = Height,
+    spread = Spread,
+    date = `Observation Date`,
+    lat = Lat,
+    lon = Long,
+    notes = `Location Notes`,
+    county = County,
+    address = Address,
+    champion.status = `National Champion`
+  ) %>%
+  filter(points > 0)
+
+# Replaces NA common names
+names <- clean_df %>%
+  select(scientific.name, common.name) %>%
+  mutate(scientific.name = tolower(scientific.name)) %>%
+  distinct(scientific.name, .keep_all = TRUE) %>%
+  drop_na() %>%
+  mutate(
+    scientific.name = str_to_sentence(scientific.name),
+    common.name = str_to_title(common.name),
+    common.name = str_replace(common.name, ", ", "/")
+  )
+
+# Joins cleaned names
+clean_df <- clean_df %>%
+  mutate(scientific.name = str_to_sentence(tolower(scientific.name))) %>%
+  select(-common.name) %>%
+  left_join(names, by = join_by(scientific.name)) %>%
+  relocate(common.name, .after = scientific.name) %>%
+  mutate(
+    scientific.name = str_replace(scientific.name, "Magnolia xsoulangeana", "Magnolia x soulangeana"),
+    common.name = case_when(
+      scientific.name == "Magnolia x soulangeana" ~ "Saucer Magnolia",
+      scientific.name == "Morus alba" ~ "White Mulberry",
+      scientific.name == "Salix alba" ~ "White Willow",
+      TRUE ~ common.name
+    ),
+    common.name = str_replace(common.name, "-", " "),
+    common.name = str_replace(common.name, " Or ", "/"),
+    champion.status = case_when(
+      is.na(champion.status) ~ "No",
+      champion.status == "Yes-Co" ~ "Yes",
+      champion.status == "Nominee" ~ "Potential",
+      champion.status == "Potenial" ~ "Potential",
+      TRUE ~ champion.status
+    ),
+    date = mdy(date)
+  )
+
+# Identifies State Champions
+state_champ <- clean_df %>%
+  group_by(scientific.name) %>%
+  arrange(desc(points)) %>%
+  slice_head(n = 1) %>%
+  ungroup() %>%
+  select(ID, champion.status) %>%
+  mutate(champion.status = str_replace(champion.status, "No", "State Champion"))
+
+# Updates champion status
+clean_df <- rows_update(clean_df, state_champ, by = "ID") %>%
+  mutate(champion.status = case_when(
+    champion.status == "Yes" ~ "National Champion",
+    champion.status == "Potential" ~ "National Nominee",
+    champion.status == "No" ~ "Big Tree",
+    TRUE ~ champion.status
+  )) %>%
+  drop_na(lon) %>%
+  mutate(
+    lon = paste0("-", lon),
+    lon = as.double(str_replace(lon, "--", "-")),
+    county = str_remove(county, " County| county")
+  )
+
+# Fixes Broken Coordinates
+clean_df <- clean_df %>%
+  mutate(
+    lat = case_when(ID == 2107 ~ 41.924761, TRUE ~ lat),
+    lon = case_when(ID == 2107 ~ -86.306041, TRUE ~ lon),
+    lat = case_when(ID == 2480 ~ 42.159734, TRUE ~ lat),
+    lon = case_when(ID == 2480 ~ -84.841703, TRUE ~ lon),
+    lat = case_when(ID == 2349 ~ 41.851322, TRUE ~ lat),
+    lon = case_when(ID == 2349 ~ -86.266463, TRUE ~ lon),
+    lat = case_when(ID == 2437 ~ 45.169645, TRUE ~ lat),
+    lon = case_when(ID == 2437 ~ -84.439508, TRUE ~ lon),
+    lat = case_when(ID == 2228 ~ 42.57587, TRUE ~ lat),
+    lon = case_when(ID == 2228 ~ -86.21077, TRUE ~ lon)
+  )
+
+# Fixes county names
+clean_df <- mutate(clean_df, county = str_replace(county, "Gd.", "Grand"))
+
+# Adds year for filtering
+clean_df <- mutate(clean_df, year = year(date))
+```
+
+```{r, results=FALSE, warning=FALSE, message=FALSE, error=FALSE}
+################################################################################
+#### 3. Map Data ###############################################################
+################################################################################
+
+# Add map labels
+map_df <- clean_df %>%
+  mutate(
+    label =
+      paste("Big Tree ID:", ID,
+        "<br>Scientific Name:", scientific.name,
+        "<br>Common Name:", common.name,
+        "<br>Coordinates:", paste(lat, lon, sep = " "),
+        "<br>Points:", points,
+        "<br>Girth (in):", girth,
+        "<br>Height (ft):", height,
+        "<br>Crown Spread (ft):", spread,
+        "<br>Status:", champion.status,
+        "<br>Date Observed:", date,
+        "<br>Location:", address,
+        sep = " "
+      )
+  )
+
+# Shared data for crosstalk
+sd <- SharedData$new(data = map_df)
+
+# Icons for champion status
+icons <- awesomeIconList(
+  "National Champion" = makeAwesomeIcon(
+    icon = "tree",
+    markerColor = "pink",
+    library = "fa"
+  ),
+  "State Champion" = makeAwesomeIcon(
+    icon = "pagelines",
+    markerColor = "lightblue",
+    library = "fa"
+  ),
+  "National Nominee" = makeAwesomeIcon(
+    icon = "leaf",
+    markerColor = "lightgreen",
+    library = "fa"
+  ),
+  "Big Tree" = makeAwesomeIcon(
+    icon = "circle",
+    markerColor = "lightgray",
+    library = "fa"
+  )
+)
+
+# State & County Lines
+# state_outline <-
+#   maps::map(
+#     database = "state",
+#     regions = "michigan",
+#     fill = TRUE,
+#     plot = FALSE
+#   )
+
+county_outlines <- tigris::counties(cb = TRUE) %>%
+  filter(STATE_NAME == "Michigan")
+```
+
+```{r}
+################################################################################
+#### 4. HTML Selectors #########################################################
+################################################################################
+
+# Data Selector 1
+bscols(
+  widths = c(1, 3, 3, 3, 1),
+  "",
+  filter_select(
+    id = "id",
+    label = "Tree ID",
+    sharedData = sd,
+    group = ~ID
+  ),
+  filter_select(
+    id = "scientific",
+    label = "Scientific Name",
+    sharedData = sd,
+    group = ~scientific.name
+  ),
+  filter_select(
+    id = "common",
+    label = "Common Name",
+    sharedData = sd,
+    group = ~common.name
+  ),
+  ""
+)
+
+# Data Selector 2
+bscols(
+  widths = c(1, 3, 3, 3, 1),
+  "",
+  filter_select(
+    id = "county",
+    label = "County",
+    sharedData = sd,
+    group = ~county
+  ),
+  filter_select(
+    id = "status",
+    label = "Status",
+    sharedData = sd,
+    group = ~champion.status
+  ),
+  filter_select(
+    id = "common",
+    label = "Year Verified",
+    sharedData = sd,
+    group = ~year
+  ),
+  ""
+)
+
+# Tree Points Slider
+bscols(
+  widths = c(1, 10, 1),
+  "",
+  filter_slider(
+    id = "points",
+    label = "Big Tree Points",
+    sharedData = sd,
+    column = ~points,
+    step = 1,
+    min = min(map_df$points),
+    max = max(map_df$points)
+  ),
+  ""
+)
+```
+
+``` {r, warning=FALSE}
+################################################################################
+#### 5. Leaflet Map ############################################################
+################################################################################
+map_df %>%
+  leaflet(width = "100%", height = 1000) %>%
+  addProviderTiles(providers$Esri.WorldImagery, group = "ESRI Satellite") %>%
+  addProviderTiles(providers$CartoDB.PositronNoLabels, group = "Simple") %>%
+  addProviderTiles(providers$OpenStreetMap.HOT, group = "OpenStreetMap") %>%
+  addProviderTiles(providers$USGS.USImageryTopo, group = "USGS Topo") %>%
+  addLayersControl(baseGroups = c("Simple", "ESRI Satellite", "OpenStreetMap", "USGS Topo")) %>%
+  addAwesomeMarkers(
+    data = sd,
+    lng = ~lon,
+    lat = ~lat,
+    popup = ~label,
+    label = ~ID,
+    icon = ~ icons[champion.status]
+  ) %>%
+  addLegend(
+    position = "bottomright",
+    colors = c("lightgray", "lightgreen", "lightblue", "pink"),
+    labels = unique(map_df$champion.status), opacity = 10,
+    title = "Status"
+  ) %>%
+  setView(lat = 44.5, lng = -85.5, zoom = 6) %>%
+  addPolygons(
+    data = county_outlines,
+    color = "black",
+    fillColor = "white",
+    weight = 1,
+    opacity = 1,
+    fillOpacity = 0,
+    highlightOptions =
+      highlightOptions(
+        color = "black",
+        weight = 3,
+        bringToFront = FALSE
+      ),
+    label = ~NAME
+  )
+```

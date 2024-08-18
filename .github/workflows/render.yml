@@ -9,7 +9,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
 
     steps:
       - name: Checkout repository
@@ -18,25 +18,12 @@ jobs:
       - name: Set up R
         uses: r-lib/actions/setup-r@v2
         with:
-          r-version: '4.2'  
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libcurl4-openssl-dev \
-            libssl-dev \
-            libxml2-dev \
-            libgeos-dev \
-            libgdal-dev \
-            libproj-dev \
-            pandoc
+          r-version: '4.4'  
 
       - name: Install R packages
         run: |
           Rscript -e "install.packages('rmarkdown', dependencies = TRUE)"
           Rscript -e "install.packages('gsheet', dependencies = TRUE)"
-          Rscript -e "install.packages('sf', dependencies = TRUE)"
           Rscript -e "install.packages('dplyr', dependencies = TRUE)"
           Rscript -e "install.packages('tidyr', dependencies = TRUE)"
           Rscript -e "install.packages('lubridate', dependencies = TRUE)"

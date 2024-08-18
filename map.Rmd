@@ -169,7 +169,8 @@ clean_df <- clean_df %>%
     lat = case_when(ID == 2437 ~ 45.169645, TRUE ~ lat),
     lon = case_when(ID == 2437 ~ -84.439508, TRUE ~ lon),
     lat = case_when(ID == 2228 ~ 42.57587, TRUE ~ lat),
-    lon = case_when(ID == 2228 ~ -86.21077, TRUE ~ lon)
+    lon = case_when(ID == 2228 ~ -86.21077, TRUE ~ lon),
+    lon = case_when(ID == 2541 ~ -88.5011, TRUE ~ lon),
   )
 
 # Fixes county names
